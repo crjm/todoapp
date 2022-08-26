@@ -59,7 +59,7 @@ new Engine({
 				core {
 					filesystem(id: "${image.core.image.exec.fs.id}") {
 						exec(input: {
-							args: ["npm", "run", "build"],
+							args: ["./node_modules/.bin/react-scripts", "build"],
 							mounts: [{path: "/src", fs: "${installDeps.core.filesystem.exec.mount.id}"}],
 							workdir: "/src"
 						}) {
