@@ -2,100 +2,88 @@
 import { gql, Engine } from "@dagger.io/dagger";
 
 new Engine({
-	ConfigPath: process.env.CLOAK_CONFIG
+  ConfigPath: process.env.CLOAK_CONFIG,
 }).run(async (client) => {
-	// 1. Load app source code from working directory
-	const source = await client.request(gql`
-	{
-	  host {
-	    workdir {
-	      read {
-	        id
-	      }
-	    }
-	  }
-	}
-  `).then((result) => result.host.workdir.read)
+  // 1. Load app source code from working directory
 
-	// 2. Install yarn in a container
-	const image = await client.request(gql`
-	{
-	  core {
-	    image(ref:"index.docker.io/alpine") {
-	      exec(input: {
-		args:["apk", "add", "yarn"]
-	      }) {
-		stdout
-		fs {
-		  exec(input:{args:["apk", "add", "git"]}) {
-		    stdout
-		    fs {
-			  exec(input: {args: ["apk", "add", "openssh"]}) {
-				fs {
-				  id
+  try {
+    const sourceCode = await client.request(gql`
+      {
+        host {
+          workdir {
+            read {
+              id
+            }
+          }
+        }
+      }
+    `);
+
+    const image = await client.request(gql`
+      {
+        core {
+          image(ref: "index.docker.io/alpine") {
+            exec(
+              input: { args: ["apk", "add", "npm", "git", "openssh-client"] }
+            ) {
+              stdout
+              fs {
+                id
+              }
+            }
+          }
+        }
+      }
+    `);
+
+    const installDeps = await client.request(gql`
+    	{
+    		core {
+    			filesystem(id: "${image.core.image.exec.fs.id}") {
+    				exec(input: {
+							args: ["npm", "install"],			
+							mounts: [{path: "/src", fs: "${sourceCode.host.workdir.read.id}"}],
+							workdir: "/src"
+						 }) {
+							mount(path: "/src") {
+								id
+							}
+						}
+    			}
+    		}
+    	}
+    `);
+
+    const buildApp = await client.request(gql`
+			{
+				core {
+					filesystem(id: "${image.core.image.exec.fs.id}") {
+						exec(input: {
+							args: ["npm", "run", "build"],
+							mounts: [{path: "/src", fs: "${installDeps.core.filesystem.exec.mount.id}"}],
+							workdir: "/src"
+						}) {
+							stdout
+							mount(path: "/src") {
+								id
+							}
+						}
+					}
 				}
-			  }
-		    }
-		  }
-		}
-	      }
-	    }
-	  }
-	}
-`).then((result) => result.core.image.exec.fs.exec.fs.exec.fs)
-
-	// 3. Run 'yarn install' in a container
-	const sourceAfterInstall = await client.request(gql`
-	{
-		core {
-		  filesystem(id: "${image.id}") {
-			exec(
-			  input: {
-				args: ["yarn", "install"]
-				mounts: [{ fs: "${source.id}", path: "/src" }]
-				workdir: "/src"
-			  }
-			) {
-			  # Retrieve modified source
-			  mount(path: "/src") {
-				id
-			  }
 			}
-		  }
-		}
-	  }
-	`).then((result) => result.core.filesystem.exec.mount)
+		`);
 
-	// 4. Run 'yarn run build' in a container
-	const sourceAfterBuild = await client.request(gql` 
-	{
-		core {
-		  filesystem(id: "${image.id}") {
-			exec(
-			  input: {
-				args: ["./node_modules/.bin/react-scripts", "build"]
-				mounts: [{ fs: "${sourceAfterInstall.id}", path: "/src" }]
-				workdir: "/src"
-			  }
-			) {
-			  # Retrieve modified source
-			  mount(path: "/src") {
-				id
-			  }
-			}
-		  }
-		}
-	  }
-	  `).then((result) => result.core.filesystem.exec.mount)
+    await client.request(gql`
+      {
+        host {
+          workdir {
+            write(contents: "${buildApp.core.filesystem.exec.mount.id}")
+          }
+        }
+      }
+    `);
 
-	// 5. write the result back to workdir
-	const result = await client.request(gql`
-	{
-		host {
-			workdir {
-				write(contents: "${sourceAfterBuild.id}")
-			}
-		}
-	}
-	`)
+  } catch (err) {
+    console.log(`error: ${err}`);
+  }
 });
