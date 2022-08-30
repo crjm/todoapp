@@ -27,7 +27,7 @@ console.log(
 const netlifyTokenCleartext = process.env.NETLIFY_AUTH_TOKEN;
 
 // Start cloak engine
-new Engine().run(async (client) => {
+new Engine({}).run(async (client) => {
   // 1. Load netlify token into a secret
   const netlifyTokenSecret = await client
     .request(

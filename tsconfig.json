@@ -1,0 +1,21 @@
+// Inspired by TSConfig bases: https://github.com/tsconfig/bases/blob/main/bases/recommended.json
+{
+  "compilerOptions": {
+    "target": "ES2015",
+    // "strict": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "declaration": true,
+    "declarationMap": true,
+    "checkJs": false
+  },
+  "files": [
+    "scripts/deploy-1/index.ts",
+    "scripts/deploy-2/index.ts"
+  ],
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "cloak-sdk-nodejs"
+}
